@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salle Confort Dashboard</title>
+  <link rel="stylesheet" href="project.css" />
+  <script src="controlle.js" defer></script>
+</head>
+<body>
+<div class="page">
+  <div class="wrap">
+    <header class="header">
+      <div>
+        <div class="header-status">
+          <span class="status-dot pulse-dot"></span>
+          Système actif &mdash; Votre Entreprise
+        </div>
+        <h1 class="font-display" id="salle-titre"></h1>
+      </div>
+      <div class="header-right">
+        <div class="clock-block">
+          <div class="clock-label">Heure locale</div>
+          <div class="clock-value font-data" id="clock"></div>
+        </div>
+        <div class="occupants-pill">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4CD4E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="font-data" id="occupants"><span id="occ-value">0</span><span class="max">/10</span></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+
+      <div class="col">
+        <section class="card">
+          <h2>Paramètres de confort</h2>
+          <div class="gauges-grid" id="gauges-grid"></div>
+        </section>
+
+        <section class="card">
+          <h2>Actionneurs</h2>
+          <div class="actionneurs-grid" id="actionneurs-grid"></div>
+        </section>
+
+        <section class="card">
+          <h2>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4CD4E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="4"/><path d="M18 16.5v1.5l1 1"/></svg> 
+            Réunion en cours
+          </h2>
+          <div class="reunion-row">
+            <div>
+              <div class="reunion-titre" id="reunion-titre"></div>
+              <div class="reunion-meta" id="reunion-meta"></div>
+            </div>
+            <div class="avatars" id="reunion-avatars"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <h2>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4CD4E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg> 
+            Terminal d'accès badgé
+          </h2>
+          <div class="terminal">
+            <div class="terminal-list" id="terminal-list">
+              <div class="terminal-empty">En attente de scan...</div>
+            </div>
+          </div>
+          <div class="terminal-hint">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg>
+            Vérification en temps réel vs. liste des invités
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>
+            <svg class="icon-warn" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 
+            Alertes actives
+          </h2>
+          <div class="alerts-list" id="alerts-list">
+            <div class="alerts-empty">Aucune alerte &mdash; tout est nominal.</div>
+          </div>
+        </section>
+
+        <section class="card note-card">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.2 14.6"/></svg>
+          <p>Données simulées à des fins de démonstration. Connecter les capteurs réels et le flux du lecteur RFID pour un fonctionnement en production.</p>
+        </section>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
