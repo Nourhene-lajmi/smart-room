@@ -33,12 +33,43 @@ const ICONS = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 };
 
-const PARAM_DEFS = [
-  { key: "temperature", label: "Température", unit: "°C", min: 10, max: 32, good: [20, 24], warn: [18, 26] },
-  { key: "co2", label: "CO2", unit: "ppm", min: 400, max: 1600, good: [400, 800], warn: [400, 1000] },
-  { key: "humidite", label: "Humidité", unit: "%", min: 10, max: 90, good: [40, 60], warn: [30, 70] },
-  { key: "luminosite", label: "Luminosité", unit: "lux", min: 0, max: 800, good: [300, 500], warn: [150, 700] },
-];
+/* ==========================================================================
+   SAISON & SEUILS DYNAMIQUES (température selon saison, CO2 selon capacité)
+   ========================================================================== */
+
+function getSaison() {
+  const mois = new Date().getMonth() + 1; // 1-12
+  // Tunisie : été ~ mai à septembre, hiver ~ octobre à avril
+  return (mois >= 5 && mois <= 9) ? "ete" : "hiver";
+}
+
+// Seuils température selon la saison (ASHRAE 55 - confort adaptatif)
+const TEMP_SAISON = {
+  ete:   { good: [23, 26], warn: [21, 28] }, // vêtements légers, tolérance chaleur
+  hiver: { good: [20, 23], warn: [18, 25] }, // vêtements chauds, tolérance froid
+};
+
+// Seuils CO2 selon la capacité de la salle (ASHRAE 62.1 - débit d'air par occupant)
+function getCO2Seuils(capacite) {
+  if (capacite <= 6)  return { good: [400, 800],  warn: [400, 1000] };  // petite salle
+  if (capacite <= 15) return { good: [400, 900],  warn: [400, 1100] };  // salle moyenne
+  return               { good: [400, 1000], warn: [400, 1200] };        // grande salle
+}
+
+function buildParamDefs() {
+  const saison = getSaison();
+  const tempRange = TEMP_SAISON[saison];
+  const co2Range = getCO2Seuils(RESERVATION.capacite);
+
+  return [
+    { key: "temperature", label: "Température", unit: "°C", min: 10, max: 32, good: tempRange.good, warn: tempRange.warn },
+    { key: "co2", label: "CO2", unit: "ppm", min: 400, max: 1600, good: co2Range.good, warn: co2Range.warn },
+    { key: "humidite", label: "Humidité", unit: "%", min: 10, max: 90, good: [40, 60], warn: [30, 70] },
+    { key: "luminosite", label: "Luminosité", unit: "lux", min: 0, max: 800, good: [300, 500], warn: [150, 700] },
+  ];
+}
+
+let PARAM_DEFS = buildParamDefs();
 
 const ACTIONNEURS_INIT = [
   { key: "ventilation", label: "Ventilation", auto: true, on: false },
@@ -123,8 +154,8 @@ function buildGaugeSVG(def, value) {
       <path d="${arcPath(startAngle, endAngle)}" stroke="#232E39" stroke-width="10" fill="none" stroke-linecap="round" />
       <path d="${arcPath(startAngle, angle)}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" style="transition: stroke 600ms ease, d 600ms ease;" />
       ${ticksMarkup}
-      <text x="${CX}" y="${CY - 6}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="26" font-weight="600" fill="#E8EDF2">${value.toFixed(decimals)}</text>
-      <text x="${CX}" y="${CY + 16}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#8494A3">${def.unit}</text>
+      <text x="${CX}" y="${CY - 6}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="26" font-weight="600" fill="#1A2B3C">${value.toFixed(decimals)}</text>
+      <text x="${CX}" y="${CY + 16}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#4A5A6A">${def.unit}</text>
     </svg>
   `;
 }
@@ -184,7 +215,7 @@ function renderGauges() {
 function renderActionneurs() {
   const grid = document.getElementById("actionneurs-grid");
   if (!grid) return;
-  
+
   grid.innerHTML = actionneurs.map((a) => `
     <div class="actionneur-card" style="border-color:${a.on ? "#35D48A55" : "#232E39"};">
       <div class="actionneur-left">
@@ -196,18 +227,18 @@ function renderActionneurs() {
           <div class="actionneur-mode">${a.auto ? "Auto" : "Manuel"}</div>
         </div>
       </div>
-      
+
       <div class="actionneur-controls">
-        <button 
-          class="btn-toggle off ${!a.on ? 'active' : ''}" 
-          data-key="${a.key}" 
+        <button
+          class="btn-toggle off ${!a.on ? 'active' : ''}"
+          data-key="${a.key}"
           data-state="off"
           aria-label="Éteindre ${a.label}">
           OFF
         </button>
-        <button 
-          class="btn-toggle on ${a.on ? 'active' : ''}" 
-          data-key="${a.key}" 
+        <button
+          class="btn-toggle on ${a.on ? 'active' : ''}"
+          data-key="${a.key}"
           data-state="on"
           aria-label="Allumer ${a.label}">
           ON
@@ -216,6 +247,7 @@ function renderActionneurs() {
     </div>
   `).join("");
 }
+
 const actionneursGrid = document.getElementById("actionneurs-grid");
 if (actionneursGrid) {
   actionneursGrid.addEventListener("click", (e) => {
@@ -237,6 +269,7 @@ if (actionneursGrid) {
     renderActionneurs();
   });
 }
+
 function renderReunion() {
   document.getElementById("reunion-titre").textContent = RESERVATION.titre;
   document.getElementById("reunion-meta").textContent =
