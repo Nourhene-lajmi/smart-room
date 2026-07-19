@@ -1,24 +1,34 @@
 /* ==========================================================================
-   DONNEES DE REFERENCE & CONFIGURATIONS
+   FIREBASE INIT
    ========================================================================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import {
+  getFirestore, doc, onSnapshot, collection, query,
+  where, orderBy, limit, updateDoc
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
-const RESERVATION = {
-  titre: "Réunion d'équipe",
-  organisateur: "Organisateur",
-  salle: "Salle de réunion",
-  debut: "09:00",
-  fin: "10:30",
-  capacite: 10,
-  invites: [
-    { nom: "Participant 1", role: "Responsable" },
-    { nom: "Participant 2", role: "Employé" },
-    { nom: "Participant 3", role: "Employé" },
-    { nom: "Participant 4", role: "Employé" },
-    { nom: "Participant 5", role: "Maintenance" },
-  ],
+const firebaseConfig = {
+  apiKey: "AIzaSyCv_NLOCXb3ApTMSjxsIDLbYrUr1Ymi-rA",
+  authDomain: "smart-room-c163c.firebaseapp.com",
+  databaseURL: "https://smart-room-c163c-default-rtdb.firebaseio.com",
+  projectId: "smart-room-c163c",
+  storageBucket: "smart-room-c163c.firebasestorage.app",
+  messagingSenderId: "552350325154",
+  appId: "1:552350325154:web:4cbe5619639f844d7dbafb",
+  measurementId: "G-7DY5JE1SR4"
 };
 
-const INCONNUS = ["Visiteur A", "Visiteur B", "Visiteur C", "Visiteur D"];
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const SALLE_ID = "salle1";
+const SALLE_COLLECTION = "salle";
+
+/* ==========================================================================
+   ICONS
+   ========================================================================== */
 
 const ICONS = {
   temperature: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
@@ -34,33 +44,29 @@ const ICONS = {
 };
 
 /* ==========================================================================
-   SAISON & SEUILS DYNAMIQUES (température selon saison, CO2 selon capacité)
+   SEUILS
    ========================================================================== */
 
+const TEMP_SAISON = {
+  ete:   { good: [23, 26], warn: [21, 28] },
+  hiver: { good: [20, 23], warn: [18, 25] },
+};
+
 function getSaison() {
-  const mois = new Date().getMonth() + 1; // 1-12
-  // Tunisie : été ~ mai à septembre, hiver ~ octobre à avril
+  const mois = new Date().getMonth() + 1;
   return (mois >= 5 && mois <= 9) ? "ete" : "hiver";
 }
 
-// Seuils température selon la saison (ASHRAE 55 - confort adaptatif)
-const TEMP_SAISON = {
-  ete:   { good: [23, 26], warn: [21, 28] }, // vêtements légers, tolérance chaleur
-  hiver: { good: [20, 23], warn: [18, 25] }, // vêtements chauds, tolérance froid
-};
-
-// Seuils CO2 selon la capacité de la salle (ASHRAE 62.1 - débit d'air par occupant)
 function getCO2Seuils(capacite) {
-  if (capacite <= 6)  return { good: [400, 800],  warn: [400, 1000] };  // petite salle
-  if (capacite <= 15) return { good: [400, 900],  warn: [400, 1100] };  // salle moyenne
-  return               { good: [400, 1000], warn: [400, 1200] };        // grande salle
+  if (capacite <= 6)  return { good: [400, 800],  warn: [400, 1000] };
+  if (capacite <= 15) return { good: [400, 900],  warn: [400, 1100] };
+  return { good: [400, 1000], warn: [400, 1200] };
 }
 
-function buildParamDefs() {
+function buildParamDefs(capacite) {
   const saison = getSaison();
   const tempRange = TEMP_SAISON[saison];
-  const co2Range = getCO2Seuils(RESERVATION.capacite);
-
+  const co2Range = getCO2Seuils(capacite);
   return [
     { key: "temperature", label: "Température", unit: "°C", min: 10, max: 32, good: tempRange.good, warn: tempRange.warn },
     { key: "co2", label: "CO2", unit: "ppm", min: 400, max: 1600, good: co2Range.good, warn: co2Range.warn },
@@ -69,29 +75,27 @@ function buildParamDefs() {
   ];
 }
 
-let PARAM_DEFS = buildParamDefs();
-
-const ACTIONNEURS_INIT = [
-  { key: "ventilation", label: "Ventilation", auto: true, on: false },
-  { key: "clim", label: "Climatisation", auto: true, on: false },
-  { key: "eclairage", label: "Éclairage", auto: true, on: true },
-];
-
 const TONE_HEX = { good: "#35D48A", warn: "#F2A93B", danger: "#F0555B", idle: "#3A4652" };
 
 /* ==========================================================================
-   ETAT GLOBAL DE L'APPLICATION
+   ETAT GLOBAL
    ========================================================================== */
 
-let values = { temperature: 22.4, co2: 640, humidite: 48, luminosite: 410 };
-let actionneurs = ACTIONNEURS_INIT.map((a) => ({ ...a }));
+let salleInfo = { nom_salle: "Salle", capacite: 10, statut: "DISPONIBLE" };
+let PARAM_DEFS = buildParamDefs(salleInfo.capacite);
+let values = { temperature: 0, co2: 0, humidite: 0, luminosite: 0 };
+let actionneurs = [
+  { key: "ventilation", label: "Ventilation", auto: true, on: false },
+  { key: "clim", label: "Climatisation", auto: true, on: false },
+  { key: "eclairage", label: "Éclairage", auto: true, on: false },
+];
 let log = [];
 let alerts = [];
-let logId = 0;
-let alertId = 0;
+let reunion = null;
+let listenersStarted = false;
 
 /* ==========================================================================
-   FONCTIONS UTILITAIRES
+   UTILITAIRES
    ========================================================================== */
 
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -113,20 +117,16 @@ function icon(name, size, color) {
 }
 
 /* ==========================================================================
-   ARC GAUGE (SVG GENERATION)
+   GAUGE SVG
    ========================================================================== */
 
 function buildGaugeSVG(def, value) {
   const status = statusFor(def, value);
   const color = TONE_HEX[status.tone];
-
-  const startAngle = -125;
-  const endAngle = 125;
+  const startAngle = -125, endAngle = 125;
   const ratio = clamp((value - def.min) / (def.max - def.min), 0, 1);
   const angle = startAngle + ratio * (endAngle - startAngle);
-
-  const R = 62;
-  const CX = 80, CY = 80;
+  const R = 62, CX = 80, CY = 80;
   const toXY = (deg) => {
     const rad = (deg - 90) * (Math.PI / 180);
     return [CX + R * Math.cos(rad), CY + R * Math.sin(rad)];
@@ -137,7 +137,6 @@ function buildGaugeSVG(def, value) {
     const large = a1 - a0 > 180 ? 1 : 0;
     return `M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}`;
   };
-
   const ticks = Array.from({ length: 9 }, (_, i) => startAngle + (i * (endAngle - startAngle)) / 8);
   const ticksMarkup = ticks.map((t) => {
     const [x1, y1] = toXY(t);
@@ -146,13 +145,11 @@ function buildGaugeSVG(def, value) {
     const y2 = CY + (R - 12) * Math.sin(rad);
     return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3A4652" stroke-width="1.5" />`;
   }).join("");
-
   const decimals = def.key === "co2" ? 0 : 1;
-
   return `
     <svg width="160" height="150" viewBox="0 0 160 150">
       <path d="${arcPath(startAngle, endAngle)}" stroke="#232E39" stroke-width="10" fill="none" stroke-linecap="round" />
-      <path d="${arcPath(startAngle, angle)}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" style="transition: stroke 600ms ease, d 600ms ease;" />
+      <path d="${arcPath(startAngle, angle)}" stroke="${color}" stroke-width="10" fill="none" stroke-linecap="round" />
       ${ticksMarkup}
       <text x="${CX}" y="${CY - 6}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="26" font-weight="600" fill="#1A2B3C">${value.toFixed(decimals)}</text>
       <text x="${CX}" y="${CY + 16}" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="11" fill="#4A5A6A">${def.unit}</text>
@@ -180,42 +177,34 @@ function buildGaugeTile(def, value) {
 }
 
 /* ==========================================================================
-   FONCTIONS DE RENDU DU DOM
+   RENDU DOM
    ========================================================================== */
 
-function occupantsCount() {
-  const present = log.filter((l) => l.statut === "autorise").length
-    - log.filter((l) => l.statut === "sortie").length;
-  return clamp(present, 0, RESERVATION.capacite + 2);
-}
-
 function renderHeaderStatic() {
-  document.getElementById("salle-titre").textContent = RESERVATION.salle;
-  document.getElementById("occ-value").parentElement.innerHTML =
-    `<span id="occ-value">${occupantsCount()}</span><span class="max">/${RESERVATION.capacite}</span>`;
+  const t = document.getElementById("salle-titre");
+  if (t) t.textContent = salleInfo.nom_salle;
 }
 
 function renderOccupants() {
   const el = document.getElementById("occupants");
-  if(el) {
-    el.innerHTML = `<span id="occ-value">${occupantsCount()}</span><span class="max">/${RESERVATION.capacite}</span>`;
-  }
+  const present = log.filter((l) => l.statut === "autorise").length;
+  const count = clamp(present, 0, salleInfo.capacite + 2);
+  if (el) el.innerHTML = `<span id="occ-value">${count}</span><span class="max">/${salleInfo.capacite}</span>`;
 }
 
 function renderClock() {
   const clockEl = document.getElementById("clock");
-  if(clockEl) clockEl.textContent = formatClock(new Date());
+  if (clockEl) clockEl.textContent = formatClock(new Date());
 }
 
 function renderGauges() {
   const grid = document.getElementById("gauges-grid");
-  if(grid) grid.innerHTML = PARAM_DEFS.map((def) => buildGaugeTile(def, values[def.key])).join("");
+  if (grid) grid.innerHTML = PARAM_DEFS.map((def) => buildGaugeTile(def, values[def.key] || 0)).join("");
 }
 
 function renderActionneurs() {
   const grid = document.getElementById("actionneurs-grid");
   if (!grid) return;
-
   grid.innerHTML = actionneurs.map((a) => `
     <div class="actionneur-card" style="border-color:${a.on ? "#35D48A55" : "#232E39"};">
       <div class="actionneur-left">
@@ -227,61 +216,32 @@ function renderActionneurs() {
           <div class="actionneur-mode">${a.auto ? "Auto" : "Manuel"}</div>
         </div>
       </div>
-
       <div class="actionneur-controls">
-        <button
-          class="btn-toggle off ${!a.on ? 'active' : ''}"
-          data-key="${a.key}"
-          data-state="off"
-          aria-label="Éteindre ${a.label}">
-          OFF
-        </button>
-        <button
-          class="btn-toggle on ${a.on ? 'active' : ''}"
-          data-key="${a.key}"
-          data-state="on"
-          aria-label="Allumer ${a.label}">
-          ON
-        </button>
+        <button class="btn-toggle off ${!a.on ? 'active' : ''}" data-key="${a.key}" data-state="off">OFF</button>
+        <button class="btn-toggle on ${a.on ? 'active' : ''}" data-key="${a.key}" data-state="on">ON</button>
       </div>
     </div>
   `).join("");
 }
 
-const actionneursGrid = document.getElementById("actionneurs-grid");
-if (actionneursGrid) {
-  actionneursGrid.addEventListener("click", (e) => {
-    const btn = e.target.closest(".btn-toggle");
-    if (!btn) return;
-
-    const key = btn.getAttribute("data-key");
-    const targetState = btn.getAttribute("data-state") === "on";
-
-    // Mettre à jour l'état de l'actionneur ciblé
-    actionneurs = actionneurs.map((a) => {
-      if (a.key === key) {
-        return { ...a, on: targetState, auto: false }; // Force le passage en Manuel
-      }
-      return a;
-    });
-
-    // Forcer le rendu immédiat des cartes mis à jour
-    renderActionneurs();
-  });
-}
-
 function renderReunion() {
-  document.getElementById("reunion-titre").textContent = RESERVATION.titre;
-  document.getElementById("reunion-meta").textContent =
-    `Organisateur : ${RESERVATION.organisateur} \u00B7 ${RESERVATION.debut} - ${RESERVATION.fin}`;
-  document.getElementById("reunion-avatars").innerHTML = RESERVATION.invites.map((p) => `
-    <div class="avatar" title="${p.nom}">${p.nom.split(" ").map((s) => s[0]).join("")}</div>
-  `).join("");
+  const titreEl = document.getElementById("reunion-titre");
+  const metaEl = document.getElementById("reunion-meta");
+  const avatarsEl = document.getElementById("reunion-avatars");
+  if (!reunion) {
+    if (titreEl) titreEl.textContent = "Aucune réunion en cours";
+    if (metaEl) metaEl.textContent = "";
+    if (avatarsEl) avatarsEl.innerHTML = "";
+    return;
+  }
+  if (titreEl) titreEl.textContent = "Réunion";
+  if (metaEl) metaEl.textContent = `${reunion.date_debut} \u2192 ${reunion.date_fin}`;
+  if (avatarsEl) avatarsEl.innerHTML = "";
 }
 
 function renderLog() {
   const list = document.getElementById("terminal-list");
-  if(!list) return;
+  if (!list) return;
   if (log.length === 0) {
     list.innerHTML = `<div class="terminal-empty">En attente de scan...</div>`;
     return;
@@ -304,90 +264,172 @@ function renderLog() {
 
 function renderAlerts() {
   const list = document.getElementById("alerts-list");
-  if(!list) return;
+  if (!list) return;
   if (alerts.length === 0) {
     list.innerHTML = `<div class="alerts-empty">Aucune alerte &mdash; tout est nominal.</div>`;
     return;
   }
   list.innerHTML = alerts.map((a) => `
-    <div class="alert-item row-in ${a.type === "acces" ? "acces" : "seuil"}">
+    <div class="alert-item row-in">
       <div>
-        <div class="alert-msg">${a.msg}</div>
-        <div class="alert-time">${a.heure}</div>
+        <div class="alert-msg">${a.message}</div>
+        <div class="alert-time">${a.date_alerte}</div>
       </div>
-      <button class="alert-dismiss" data-id="${a.id}" aria-label="Ignorer l'alerte">
-        ${icon("x", 13, "currentColor")}
-      </button>
+      <button class="alert-dismiss" data-id="${a.id}">${icon("x", 13, "currentColor")}</button>
     </div>
   `).join("");
 }
 
 /* ==========================================================================
-   SIMULATION DE FLUX & CAPTEURS
+   FIRESTORE LISTENERS (démarrés seulement après connexion confirmée)
    ========================================================================== */
 
-function tickSensors() {
-  const occ = occupantsCount();
-  const occFactor = occ / RESERVATION.capacite;
-  values = {
-    temperature: clamp(values.temperature + (Math.random() - 0.45) * 0.3 + occFactor * 0.05, 16, 30),
-    co2: clamp(values.co2 + (Math.random() - 0.3) * 25 + occFactor * 18, 400, 1500),
-    humidite: clamp(values.humidite + (Math.random() - 0.5) * 1.2, 20, 80),
-    luminosite: clamp(values.luminosite + (Math.random() - 0.5) * 14, 50, 750),
-  };
+function startFirestoreListeners() {
+  if (listenersStarted) return;
+  listenersStarted = true;
 
-  actionneurs = actionneurs.map((a) => {
-    if (!a.auto) return a;
-    if (a.key === "ventilation") return { ...a, on: values.co2 > 850 };
-    if (a.key === "clim") return { ...a, on: values.temperature > 24.5 || values.temperature < 19.5 };
-    if (a.key === "eclairage") return { ...a, on: values.luminosite < 320 || occ > 0 };
-    return a;
-  });
+  onSnapshot(doc(db, SALLE_COLLECTION, SALLE_ID), (snap) => {
+    if (!snap.exists()) {
+      console.warn("Document salle introuvable:", SALLE_COLLECTION, SALLE_ID);
+      return;
+    }
+    const d = snap.data();
+    salleInfo = {
+      nom_salle: d.nom_salle || "Salle",
+      capacite: d.capacite || 10,
+      statut: d.statut || "DISPONIBLE",
+    };
+    PARAM_DEFS = buildParamDefs(salleInfo.capacite);
 
-  const critiques = [];
-  PARAM_DEFS.forEach((def) => {
-    const s = statusFor(def, values[def.key]);
-    if (s.tone === "danger") critiques.push(`${def.label} hors plage : ${values[def.key].toFixed(1)} ${def.unit}`);
-  });
-  const kept = alerts.filter((p) => p.type === "acces");
-  const fresh = critiques.map((msg) => ({ id: `seuil-${msg}`, type: "seuil", msg, heure: formatClock(new Date()) }));
-  alerts = [...fresh, ...kept].slice(0, 6);
+    actionneurs = actionneurs.map((a) => {
+      if (a.key === "ventilation") return { ...a, on: d.ventilation_etat === "ON" };
+      if (a.key === "clim") return { ...a, on: d.climatisation_etat === "ON" };
+      if (a.key === "eclairage") return { ...a, on: d.eclairage_etat === "ON" };
+      return a;
+    });
 
-  renderGauges();
-  renderActionneurs();
-  renderAlerts();
-}
+    renderHeaderStatic();
+    renderOccupants();
+    renderGauges();
+    renderActionneurs();
+  }, (error) => console.error("Erreur salle:", error));
 
-function pushScan() {
-  const isInvite = Math.random() > 0.28;
-  let nom, role, statut;
-  if (isInvite) {
-    const person = RESERVATION.invites[Math.floor(Math.random() * RESERVATION.invites.length)];
-    nom = person.nom; role = person.role; statut = "autorise";
-  } else {
-    nom = INCONNUS[Math.floor(Math.random() * INCONNUS.length)];
-    role = "Employé";
-    statut = "refuse";
-  }
-  logId += 1;
-  const entry = { id: logId, nom, role, statut, heure: formatClock(new Date()) };
-  log = [entry, ...log].slice(0, 9);
+  const mesuresQuery = query(
+    collection(db, "mesures"),
+    where("id_salle", "==", SALLE_ID),
+    orderBy("date_mesure", "desc"),
+    limit(1)
+  );
+  onSnapshot(mesuresQuery, (snap) => {
+    if (snap.empty) {
+      console.warn("Aucune mesure trouvée");
+      return;
+    }
+    const d = snap.docs[0].data();
+    values = {
+      temperature: d.temperature || 0,
+      co2: d.qualite_air || 0,
+      humidite: d.humidite || 0,
+      luminosite: d.luminosite || 0,
+    };
+    renderGauges();
+  }, (error) => console.error("Erreur mesures:", error));
 
-  if (statut === "refuse") {
-    alertId += 1;
-    alerts = [
-      { id: `acces-${alertId}`, type: "acces", msg: `Accès refusé : ${nom}`, heure: entry.heure },
-      ...alerts,
-    ].slice(0, 6);
-  }
+  const alertesQuery = query(
+    collection(db, "alertes"),
+    where("id_salle", "==", SALLE_ID),
+    where("statut", "==", "NON_LUE")
+  );
+  onSnapshot(alertesQuery, (snap) => {
+    alerts = snap.docs.map((docu) => ({ id: docu.id, ...docu.data() }));
+    renderAlerts();
+  }, (error) => console.error("Erreur alertes:", error));
 
-  renderLog();
-  renderOccupants();
-  renderAlerts();
+  const reservationsQuery = query(
+    collection(db, "reservations"),
+    where("id_salle", "==", SALLE_ID),
+    where("statut", "==", "CONFIRMEE")
+  );
+  onSnapshot(reservationsQuery, (snap) => {
+    reunion = snap.empty ? null : snap.docs[0].data();
+    renderReunion();
+  }, (error) => console.error("Erreur reservations:", error));
+
+  const accesQuery = query(
+    collection(db, "acces_logs"),
+    where("id_salle", "==", SALLE_ID),
+    orderBy("date_heure", "desc"),
+    limit(9)
+  );
+  onSnapshot(accesQuery, (snap) => {
+    log = snap.docs.map((docu) => {
+      const d = docu.data();
+      return {
+        nom: d.rfid_tag,
+        statut: d.statut_acces === "ACCEPTE" ? "autorise" : "refuse",
+        heure: d.date_heure,
+      };
+    });
+    renderLog();
+    renderOccupants();
+  }, (error) => console.error("Erreur acces_logs:", error));
 }
 
 /* ==========================================================================
-   INITIALISATION ET ECOUTEURS
+   VERIFICATION AUTHENTIFICATION
+   ========================================================================== */
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    console.warn("Utilisateur non connecté, redirection vers login...");
+    window.location.href = "../login/fdd.html";
+  } else {
+    console.log("Connecté en tant que :", user.email);
+    startFirestoreListeners();
+  }
+});
+
+/* ==========================================================================
+   ACTIONS UTILISATEUR
+   ========================================================================== */
+
+const actionneursGrid = document.getElementById("actionneurs-grid");
+if (actionneursGrid) {
+  actionneursGrid.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".btn-toggle");
+    if (!btn) return;
+    const key = btn.getAttribute("data-key");
+    const targetState = btn.getAttribute("data-state") === "on";
+    const fieldMap = {
+      ventilation: "ventilation_etat",
+      clim: "climatisation_etat",
+      eclairage: "eclairage_etat",
+    };
+    const field = fieldMap[key];
+    if (!field) return;
+    try {
+      await updateDoc(doc(db, SALLE_COLLECTION, SALLE_ID), {
+        [field]: targetState ? "ON" : "OFF",
+      });
+    } catch (err) {
+      alert("Erreur mise à jour actionneur : " + err.message);
+    }
+  });
+}
+
+const alertsListEl = document.getElementById("alerts-list");
+if (alertsListEl) {
+  alertsListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".alert-dismiss");
+    if (!btn) return;
+    const id = btn.getAttribute("data-id");
+    alerts = alerts.filter((a) => a.id !== id);
+    renderAlerts();
+  });
+}
+
+/* ==========================================================================
+   INITIALISATION
    ========================================================================== */
 
 function init() {
@@ -398,24 +440,7 @@ function init() {
   renderReunion();
   renderLog();
   renderAlerts();
-
-  // Écouteur délégué pour fermer les alertes
-  const alertsList = document.getElementById("alerts-list");
-  if(alertsList) {
-    alertsList.addEventListener("click", (e) => {
-      const btn = e.target.closest(".alert-dismiss");
-      if (!btn) return;
-      const id = btn.getAttribute("data-id");
-      alerts = alerts.filter((a) => a.id !== id);
-      renderAlerts();
-    });
-  }
-
-  // Boucles de rafraîchissement
   setInterval(renderClock, 1000);
-  setInterval(tickSensors, 2500);
-  setInterval(pushScan, 4200);
 }
 
-// Lancement au chargement du DOM
 document.addEventListener("DOMContentLoaded", init);
