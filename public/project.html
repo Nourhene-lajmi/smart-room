@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Salle Confort Dashboard</title>
-  <link rel="stylesheet" href="project.css" />
-  <script type="module" src="controlle.js"></script>
+  <link rel="stylesheet" href="assets/css/project.css" />
 </head>
 <body>
 <div class="page">
@@ -16,12 +15,12 @@
           <span class="status-dot pulse-dot"></span>
           Système actif &mdash; Votre Entreprise
         </div>
-        <h1 class="font-display" id="salle-titre"></h1>
+        <h1 class="font-display" id="salle-titre">Salle de réunion</h1>
       </div>
       <div class="header-right">
         <div class="clock-block">
           <div class="clock-label">Heure locale</div>
-          <div class="clock-value font-data" id="clock"></div>
+          <div class="clock-value font-data" id="clock">--:--:--</div>
         </div>
         <div class="occupants-pill">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4CD4E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -50,7 +49,7 @@
           </h2>
           <div class="reunion-row">
             <div>
-              <div class="reunion-titre" id="reunion-titre"></div>
+              <div class="reunion-titre" id="reunion-titre">Aucune réunion en cours</div>
               <div class="reunion-meta" id="reunion-meta"></div>
             </div>
             <div class="avatars" id="reunion-avatars"></div>
@@ -94,5 +93,7 @@
     </div>
   </div>
 </div>
+
+<script type="module" src="../src/controllers/DashboardController.js"></script>
 </body>
 </html>
