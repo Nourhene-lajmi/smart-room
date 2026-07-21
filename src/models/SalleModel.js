@@ -31,6 +31,8 @@ export const SalleModel = {
   },
 
   watchMesures(callback) {
+    console.log("DEBUG - SALLE_ID utilisé :", JSON.stringify(SALLE_ID));
+
     const q = query(
       collection(db, "mesures"),
       where("id_salle", "==", SALLE_ID),
@@ -40,10 +42,12 @@ export const SalleModel = {
     return onSnapshot(
       q,
       (snap) => {
+        console.log("DEBUG - snap.empty :", snap.empty, "| taille :", snap.size);
         if (snap.empty) {
           console.warn("Aucune mesure trouvée");
           return;
         }
+        console.log("DEBUG - données reçues :", snap.docs[0].data());
         callback(snap.docs[0].data());
       },
       (error) => console.error("Erreur mesures:", error)
