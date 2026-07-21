@@ -1,4 +1,4 @@
-import { AuthController } from "../controllers/AuthController.js";
+import AuthController from "../controllers/AuthController.js";
 
 function initAuthView() {
   const signupBtn = document.getElementById("signupBtn");
@@ -13,7 +13,7 @@ function initAuthView() {
       try {
         await AuthController.handleSignUp(name, email, password);
         alert("Compte créé avec succès !");
-        window.location.href = "../../project.html";
+        window.location.href = "project.html";
       } catch (error) {
         alert("Erreur : " + error.message);
       }
@@ -28,7 +28,7 @@ function initAuthView() {
       try {
         await AuthController.handleSignIn(email, password);
         alert("Connexion réussie !");
-        window.location.href = "../../project.html";
+        window.location.href = "project.html";
       } catch (error) {
         alert("Erreur : " + error.message);
       }
