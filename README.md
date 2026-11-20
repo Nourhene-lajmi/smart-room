@@ -6,6 +6,7 @@ Projet d'équipe réalisé dans le cadre du PFA à l'ISSAT Kairouan (Licence en 
 
 🔗 **Démo en ligne :** https://smart-room-c163c.web.app
 
+![Dashboard Smart Comfort Room](dashboard.png)
 ## ✨ Fonctionnalités
 
 - Mesure en temps réel de la température, de l'humidité, de la qualité de l'air et de la luminosité
